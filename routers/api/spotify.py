@@ -69,10 +69,16 @@ async def get_spotify_now_playing(request: Request) -> JSONResponse:
                 "Authorization": f"Bearer {bearer_token}",
             },
         ) as resp:
+            if "application/json" not in resp.headers.get(
+                "content-type", "no content-type header provided",
+            ):
+                return JSONResponse(
+                    status_code=412,
+                    headers={"Access-Control-Allow-Origin": "*"},
+                    content={"status": "No song playing"}
+                )
             return JSONResponse(
                 status_code=resp.status,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                },
+                headers={"Access-Control-Allow-Origin": "*"},
                 content=await resp.json(),
             )
