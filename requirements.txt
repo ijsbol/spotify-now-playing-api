@@ -1,3 +1,6 @@
 aiohttp
 fastapi
 python-dotenv
+gunicorn
+unvicorn
+itsdangerous
