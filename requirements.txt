@@ -2,5 +2,6 @@ aiohttp
 fastapi
 python-dotenv
 gunicorn
-unvicorn
+uvicorn
 itsdangerous
+fake-headers
