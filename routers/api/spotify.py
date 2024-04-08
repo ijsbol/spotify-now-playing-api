@@ -3,7 +3,7 @@ from os import getenv
 import time
 from typing import Any, Dict, Final, TypedDict, cast
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ContentTypeError
 from dotenv import load_dotenv
 from fastapi import APIRouter, Request
 from fake_headers import Headers
@@ -115,8 +115,11 @@ async def get_lyrics_from_api(track_id: str) -> Any:
             if resp.status == 404:
                 lyric_cache["lyrics"] = None
             else:
-                json = await resp.json()
-                lyric_cache["lyrics"] = json["lyrics"]
+                try:
+                    json = await resp.json()
+                    lyric_cache["lyrics"] = json["lyrics"]
+                except ContentTypeError:
+                    lyric_cache["lyrics"] = None
     return lyric_cache["lyrics"]
 
 
