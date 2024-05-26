@@ -16,11 +16,11 @@ load_dotenv()
 
 NOW_PLAYING_ENDPOINT: Final[str] = "https://api.spotify.com/v1/me/player/currently-playing"
 TOKEN_ENDPOINT: Final[str] = "https://accounts.spotify.com/api/token"
-CLIENT_ID = cast(str, getenv("SPOTIFY_CLIENT_ID"))
-CLIENT_SECRET = cast(str, getenv("SPOTIFY_CLIENT_SECRET"))
-REFRESH_TOKEN = cast(str, getenv("SPOTIFY_USER_REFRESH_TOKEN"))
-SPOTIFY_SP_DC = cast(str, getenv("SPOTIFY_SP_DC"))
-SPOTIFY_SP_KEY = cast(str, getenv("SPOTIFY_SP_KEY"))
+CLIENT_ID: Final[str] = cast(str, getenv("SPOTIFY_CLIENT_ID"))
+CLIENT_SECRET: Final[str] = cast(str, getenv("SPOTIFY_CLIENT_SECRET"))
+REFRESH_TOKEN: Final[str] = cast(str, getenv("SPOTIFY_USER_REFRESH_TOKEN"))
+SPOTIFY_SP_DC: Final[str] = cast(str, getenv("SPOTIFY_SP_DC"))
+SPOTIFY_SP_KEY: Final[str] = cast(str, getenv("SPOTIFY_SP_KEY"))
 MAX_TIME_DELTA_BETWEEN_REFRESHES: Final[int] = 60 * 60  # 1 hour
 DEFAULT_CACHE_EXPIRE_SECONDS: Final[int] = 12 * 60 * 60  # 12 hours
 
