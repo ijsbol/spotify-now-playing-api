@@ -160,7 +160,7 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
 
 
 @router.get('/spotify/now-playing')
-async def get_spotify_now_playing(request: Request) -> JSONResponse:
+async def get_spotify_now_playing(request: Request, include_lyrics: bool = True) -> JSONResponse:
     """ Get users currently playing Spotify song. """
 
     bearer_token = await get_user_token()
@@ -183,7 +183,9 @@ async def get_spotify_now_playing(request: Request) -> JSONResponse:
             spotify_data = await resp.json()
             track_id = spotify_data["item"]["id"]
             time_ms = spotify_data["progress_ms"]
-            current_lyric = await get_lyrics_at_time(track_id, time_ms)
+            current_lyric = "Lyric fetching disabled."
+            if include_lyrics:
+                current_lyric = await get_lyrics_at_time(track_id, time_ms)
             return JSONResponse(
                 status_code=resp.status,
                 headers={"Access-Control-Allow-Origin": "*"},
