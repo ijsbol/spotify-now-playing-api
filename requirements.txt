@@ -1,7 +1,0 @@
-aiohttp
-fastapi
-python-dotenv
-gunicorn
-uvicorn
-itsdangerous
-fake-headers
