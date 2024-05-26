@@ -1,7 +1,8 @@
 import base64
+import json
 from os import getenv
 import time
-from typing import Any, Dict, Final, TypedDict, cast
+from typing import Any, Final, TypedDict, cast
 
 from aiohttp import ClientSession, ContentTypeError
 from dotenv import load_dotenv
@@ -13,14 +14,6 @@ from starlette.responses import JSONResponse
 load_dotenv()
 
 
-router = APIRouter()
-
-
-class LyricCache(TypedDict):
-    track_id: str
-    lyrics: Any
-
-
 NOW_PLAYING_ENDPOINT: Final[str] = "https://api.spotify.com/v1/me/player/currently-playing"
 TOKEN_ENDPOINT: Final[str] = "https://accounts.spotify.com/api/token"
 CLIENT_ID = cast(str, getenv("SPOTIFY_CLIENT_ID"))
@@ -29,29 +22,45 @@ REFRESH_TOKEN = cast(str, getenv("SPOTIFY_ISABELLE_REFRESH_TOKEN"))
 SPOTIFY_SP_DC = cast(str, getenv("SPOTIFY_SP_DC"))
 SPOTIFY_SP_KEY = cast(str, getenv("SPOTIFY_SP_KEY"))
 MAX_TIME_DELTA_BETWEEN_REFRESHES: Final[int] = 60 * 60  # 1 hour
+DEFAULT_CACHE_EXPIRE_SECONDS: Final[int] = 12 * 60 * 60  # 12 hours
 
 
-global isabelle_token_last_refreshed
-global lyric_api_token_expires_at
-global current_isabelle_token
-global current_lyric_api_token
-isabelle_token_last_refreshed: float = 0
-lyric_api_token_expires_at: float = 0
-current_isabelle_token: str = ""
-current_lyric_api_token: str = ""
+with open("cache.json", "w+") as f:
+    json.dump({}, f)
 
 
-global lyric_cache
-lyric_cache: LyricCache = LyricCache(track_id="", lyrics=None)
+class LyricCache(TypedDict):
+    track_id: str
+    lyrics: Any
+
+
+router = APIRouter()
 
 
 def generate_auth() -> str:
     return base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode("ascii")).decode("utf-8")
 
 
+def cache_get(ref: str) -> Any:
+    """Get the cache for the provided pointer."""
+    with open("cache.json", "r") as f:
+        cache = json.loads(f.read())
+    return cache.get(ref, None)
+
+
+def cache_update(ref: str, data: Any) -> Any:
+    """Update the cache for the provided pointer."""
+    with open("cache.json", "r") as f_r:
+        cache = json.loads(f_r.read())
+        cache[ref] = data
+        with open("cache.json", "w") as f_w:
+            json.dump(cache, f_w)
+    return data
+
+
 async def get_isabelle_token() -> str:
-    global isabelle_token_last_refreshed
-    global current_isabelle_token
+    isabelle_token_last_refreshed = cache_get("isabelle_token_last_refreshed") or 0
+    current_isabelle_token = cache_get("current_isabelle_token") or ""
     if (time.time() - isabelle_token_last_refreshed) > MAX_TIME_DELTA_BETWEEN_REFRESHES:
         auth = generate_auth()
         async with ClientSession() as session:
@@ -67,15 +76,14 @@ async def get_isabelle_token() -> str:
                 },
             ) as resp:
                 json = await resp.json()
-                isabelle_token_last_refreshed = time.time()
-                current_isabelle_token = json["access_token"]
+                cache_update("isabelle_token_last_refreshed", time.time())
+                current_isabelle_token = cache_update("current_isabelle_token", json["access_token"])
     return current_isabelle_token
 
 
-
 async def get_lyric_api_token() -> str:
-    global lyric_api_token_expires_at
-    global current_lyric_api_token
+    lyric_api_token_expires_at = cache_get("lyric_api_token_expires_at") or 0
+    current_lyric_api_token = cache_get("current_lyric_api_token") or ""
     if time.time() > (lyric_api_token_expires_at - 10_000):  # -10s for padding
         headers = Headers().generate()
         async with ClientSession() as session:
@@ -92,12 +100,13 @@ async def get_lyric_api_token() -> str:
                 }
             ) as resp:
                 json = await resp.json()
-                lyric_api_token_expires_at = json["accessTokenExpirationTimestampMs"]
-                current_lyric_api_token = json["accessToken"]
+                lyric_api_token_expires_at = cache_update("lyric_api_token_expires_at", json["accessTokenExpirationTimestampMs"])
+                current_lyric_api_token = cache_update("current_lyric_api_token", json["accessToken"])
     return current_lyric_api_token
 
 
 async def get_lyrics_from_api(track_id: str) -> Any:
+    lyric_cache = cache_get("lyric_cache") or LyricCache(track_id="", lyrics=None)
     if lyric_cache["track_id"] == track_id:
         return lyric_cache["lyrics"]
 
@@ -120,6 +129,8 @@ async def get_lyrics_from_api(track_id: str) -> Any:
                     lyric_cache["lyrics"] = json["lyrics"]
                 except ContentTypeError:
                     lyric_cache["lyrics"] = None
+
+    cache_update("lyric_cache", lyric_cache)
     return lyric_cache["lyrics"]
 
 
