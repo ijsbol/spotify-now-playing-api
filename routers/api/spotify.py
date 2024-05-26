@@ -18,7 +18,7 @@ NOW_PLAYING_ENDPOINT: Final[str] = "https://api.spotify.com/v1/me/player/current
 TOKEN_ENDPOINT: Final[str] = "https://accounts.spotify.com/api/token"
 CLIENT_ID = cast(str, getenv("SPOTIFY_CLIENT_ID"))
 CLIENT_SECRET = cast(str, getenv("SPOTIFY_CLIENT_SECRET"))
-REFRESH_TOKEN = cast(str, getenv("SPOTIFY_ISABELLE_REFRESH_TOKEN"))
+REFRESH_TOKEN = cast(str, getenv("SPOTIFY_USER_REFRESH_TOKEN"))
 SPOTIFY_SP_DC = cast(str, getenv("SPOTIFY_SP_DC"))
 SPOTIFY_SP_KEY = cast(str, getenv("SPOTIFY_SP_KEY"))
 MAX_TIME_DELTA_BETWEEN_REFRESHES: Final[int] = 60 * 60  # 1 hour
@@ -58,10 +58,10 @@ def cache_update(ref: str, data: Any) -> Any:
     return data
 
 
-async def get_isabelle_token() -> str:
-    isabelle_token_last_refreshed = cache_get("isabelle_token_last_refreshed") or 0
-    current_isabelle_token = cache_get("current_isabelle_token") or ""
-    if (time.time() - isabelle_token_last_refreshed) > MAX_TIME_DELTA_BETWEEN_REFRESHES:
+async def get_user_token() -> str:
+    user_token_last_refreshed = cache_get("user_token_last_refreshed") or 0
+    current_user_token = cache_get("current_user_token") or ""
+    if (time.time() - user_token_last_refreshed) > MAX_TIME_DELTA_BETWEEN_REFRESHES:
         auth = generate_auth()
         async with ClientSession() as session:
             async with session.post(
@@ -76,9 +76,9 @@ async def get_isabelle_token() -> str:
                 },
             ) as resp:
                 json = await resp.json()
-                cache_update("isabelle_token_last_refreshed", time.time())
-                current_isabelle_token = cache_update("current_isabelle_token", json["access_token"])
-    return current_isabelle_token
+                cache_update("user_token_last_refreshed", time.time())
+                current_user_token = cache_update("current_user_token", json["access_token"])
+    return current_user_token
 
 
 async def get_lyric_api_token() -> str:
@@ -161,9 +161,9 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
 
 @router.get('/spotify/now-playing')
 async def get_spotify_now_playing(request: Request) -> JSONResponse:
-    """ Get Isabelles currently playing Spotify song. """
+    """ Get users currently playing Spotify song. """
 
-    bearer_token = await get_isabelle_token()
+    bearer_token = await get_user_token()
 
     async with ClientSession() as session:
         async with session.get(
