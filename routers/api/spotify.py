@@ -23,6 +23,7 @@ SPOTIFY_SP_DC: Final[str] = cast(str, getenv("SPOTIFY_SP_DC"))
 SPOTIFY_SP_KEY: Final[str] = cast(str, getenv("SPOTIFY_SP_KEY"))
 MAX_TIME_DELTA_BETWEEN_REFRESHES: Final[int] = 60 * 60  # 1 hour
 DEFAULT_CACHE_EXPIRE_SECONDS: Final[int] = 12 * 60 * 60  # 12 hours
+LYRIC_OFFSET_PADDING: Final[int] = 10_000  # 10 seconds (10,000ms)
 
 
 with open("cache.json", "w+") as f:
@@ -59,8 +60,8 @@ def cache_update(ref: str, data: Any) -> Any:
 
 
 async def get_user_token() -> str:
-    user_token_last_refreshed = cache_get("user_token_last_refreshed") or 0
-    current_user_token = cache_get("current_user_token") or ""
+    user_token_last_refreshed: int = cache_get("user_token_last_refreshed") or 0
+    current_user_token: str = cache_get("current_user_token") or ""
     if (time.time() - user_token_last_refreshed) > MAX_TIME_DELTA_BETWEEN_REFRESHES:
         auth = generate_auth()
         async with ClientSession() as session:
@@ -82,9 +83,9 @@ async def get_user_token() -> str:
 
 
 async def get_lyric_api_token() -> str:
-    lyric_api_token_expires_at = cache_get("lyric_api_token_expires_at") or 0
-    current_lyric_api_token = cache_get("current_lyric_api_token") or ""
-    if time.time() > (lyric_api_token_expires_at - 10_000):  # -10s for padding
+    lyric_api_token_expires_at: int = cache_get("lyric_api_token_expires_at") or 0
+    current_lyric_api_token: str = cache_get("current_lyric_api_token") or ""
+    if time.time() > (lyric_api_token_expires_at - LYRIC_OFFSET_PADDING):
         headers = Headers().generate()
         async with ClientSession() as session:
             async with session.get(
@@ -106,11 +107,11 @@ async def get_lyric_api_token() -> str:
 
 
 async def get_lyrics_from_api(track_id: str) -> Any:
-    lyric_cache = cache_get("lyric_cache") or LyricCache(track_id="", lyrics=None)
+    lyric_cache: LyricCache = cache_get("lyric_cache") or LyricCache(track_id="", lyrics=None)
     if lyric_cache["track_id"] == track_id:
         return lyric_cache["lyrics"]
 
-    lyric_api_token = await get_lyric_api_token()
+    lyric_api_token: str = await get_lyric_api_token()
     lyric_cache["track_id"] = track_id
     async with ClientSession() as session:
         async with session.get(
@@ -138,8 +139,8 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
     lyrics = await get_lyrics_from_api(track_id)
     found_words: str = "No lyrics found"
     found_words_start_time: int = 0
-    _found_words = found_words
-    _found_words_start_time = found_words_start_time
+    _found_words: str = found_words
+    _found_words_start_time: int = found_words_start_time
 
     # No lyrics found
     if lyrics is None or len(lyrics["lines"]) == 0:
@@ -163,7 +164,7 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
 async def get_spotify_now_playing(request: Request, include_lyrics: bool = True) -> JSONResponse:
     """ Get users currently playing Spotify song. """
 
-    bearer_token = await get_user_token()
+    bearer_token: str = await get_user_token()
 
     async with ClientSession() as session:
         async with session.get(
@@ -180,12 +181,12 @@ async def get_spotify_now_playing(request: Request, include_lyrics: bool = True)
                     headers={"Access-Control-Allow-Origin": "*"},
                     content={"status": "No song playing"}
                 )
-            spotify_data = await resp.json()
-            track_id = spotify_data["item"]["id"]
-            time_ms = spotify_data["progress_ms"]
-            current_lyric = "Lyric fetching disabled."
+            spotify_data: dict[str, Any] = await resp.json()
+            track_id: str = spotify_data["item"]["id"]
+            time_ms: int = spotify_data["progress_ms"]
+            current_lyric: str = "Lyric fetching disabled."
             if include_lyrics:
-                current_lyric = await get_lyrics_at_time(track_id, time_ms)
+                current_lyric: str = await get_lyrics_at_time(track_id, time_ms)
             return JSONResponse(
                 status_code=resp.status,
                 headers={"Access-Control-Allow-Origin": "*"},
