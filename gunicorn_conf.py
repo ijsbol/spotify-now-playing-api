@@ -1,0 +1,14 @@
+# gunicorn_conf.py
+from multiprocessing import cpu_count
+from typing import Final
+
+bind: Final[str] = "127.0.0.1:7900"
+
+# Worker Options
+workers: Final[int] = cpu_count() + 1
+worker_class: Final[str] = 'uvicorn.workers.UvicornWorker'
+
+# Logging Options
+loglevel: Final[str] = 'error'
+accesslog: Final[str] = '/root/api.1sabelle.dev/logs/access_log'
+errorlog: Final[str] =  '/root/api.1sabelle.dev/logs/error_log'
