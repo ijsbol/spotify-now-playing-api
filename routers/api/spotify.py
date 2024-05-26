@@ -24,6 +24,7 @@ SPOTIFY_SP_KEY: Final[str] = cast(str, getenv("SPOTIFY_SP_KEY"))
 MAX_TIME_DELTA_BETWEEN_REFRESHES: Final[int] = 60 * 60  # 1 hour
 DEFAULT_CACHE_EXPIRE_SECONDS: Final[int] = 12 * 60 * 60  # 12 hours
 LYRIC_OFFSET_PADDING: Final[int] = 10_000  # 10 seconds (10,000ms)
+SPOTIFY_API_AUTH_TOKEN: Final[str] = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode("ascii")).decode("utf-8")
 
 
 with open("cache.json", "w+") as f:
@@ -36,10 +37,6 @@ class LyricCache(TypedDict):
 
 
 router = APIRouter()
-
-
-def generate_auth() -> str:
-    return base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode("ascii")).decode("utf-8")
 
 
 def cache_get(ref: str) -> Any:
@@ -63,12 +60,11 @@ async def get_user_token() -> str:
     user_token_last_refreshed: int = cache_get("user_token_last_refreshed") or 0
     current_user_token: str = cache_get("current_user_token") or ""
     if (time.time() - user_token_last_refreshed) > MAX_TIME_DELTA_BETWEEN_REFRESHES:
-        auth = generate_auth()
         async with ClientSession() as session:
             async with session.post(
                 url=TOKEN_ENDPOINT,
                 headers={
-                    "Authorization": f"Basic {auth}",
+                    "Authorization": f"Basic {SPOTIFY_API_AUTH_TOKEN}",
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
                 params={
