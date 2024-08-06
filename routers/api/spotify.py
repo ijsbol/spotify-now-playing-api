@@ -58,7 +58,7 @@ with open("cache.json", "w+") as f:
 
 class LyricCache(TypedDict):
     track_id: str
-    lyrics: Any
+    lines: list[Any]
 
 
 router = APIRouter()
@@ -103,57 +103,31 @@ async def get_user_token() -> str:
     return current_user_token
 
 
-async def get_lyric_api_token() -> str:
-    lyric_api_token_expires_at: int = cache_get("lyric_api_token_expires_at") or 0
-    current_lyric_api_token: str = cache_get("current_lyric_api_token") or ""
-    if time.time() > (lyric_api_token_expires_at - LYRIC_OFFSET_PADDING):
-        headers = Headers().generate()
-        async with ClientSession() as session:
-            async with session.get(
-                url="https://open.spotify.com/get_access_token",
-                headers=headers,
-                params={
-                    "reason": "web-player",
-                    "productType": "web-player",
-                },
-                cookies={
-                    "sp_dc": SPOTIFY_SP_DC,
-                    "sp_key": SPOTIFY_SP_KEY,
-                }
-            ) as resp:
-                json = await resp.json()
-                lyric_api_token_expires_at = cache_update("lyric_api_token_expires_at", json["accessTokenExpirationTimestampMs"])
-                current_lyric_api_token = cache_update("current_lyric_api_token", json["accessToken"])
-    return current_lyric_api_token
-
 
 async def get_lyrics_from_api(track_id: str) -> Any:
-    lyric_cache: LyricCache = cache_get("lyric_cache") or LyricCache(track_id="", lyrics=None)
+    lyric_cache: LyricCache = cache_get("lyric_cache") or LyricCache(track_id="", lines=[])
     if lyric_cache["track_id"] == track_id:
-        return lyric_cache["lyrics"]
+        return lyric_cache["lines"]
 
-    lyric_api_token: str = await get_lyric_api_token()
     lyric_cache["track_id"] = track_id
     async with ClientSession() as session:
         async with session.get(
-            url=f"https://spclient.wg.spotify.com/color-lyrics/v2/track/{track_id}?format=json&vocalRemoval=false",
+            url=f"https://serux.pro/v1/lyrics/{track_id}",
             headers={
-                "App-Platform": "WebPlayer",
-                "Authorization": f"Bearer {lyric_api_token}",
+                "User-Agent": "git.uwu.gal/spotify-now-playing",
             },
-            skip_auto_headers=["User-Agent", "Accept-Encoding"],
         ) as resp:
             if resp.status == 404:
-                lyric_cache["lyrics"] = None
+                lyric_cache["lines"] = []
             else:
                 try:
                     json = await resp.json()
-                    lyric_cache["lyrics"] = json["lyrics"]
+                    lyric_cache["lines"] = json["lines"]
                 except ContentTypeError:
-                    lyric_cache["lyrics"] = None
+                    lyric_cache["lines"] = []
 
     cache_update("lyric_cache", lyric_cache)
-    return lyric_cache["lyrics"]
+    return lyric_cache["lines"]
 
 
 async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
@@ -164,18 +138,18 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
     _found_words_start_time: int = found_words_start_time
 
     # No lyrics found
-    if lyrics is None or len(lyrics["lines"]) == 0:
+    if lyrics is None or len(lyrics) == 0:
         return found_words
 
     line_number: int = 0
     while (
         _found_words_start_time < time_ms
-        and len(lyrics["lines"]) > line_number
+        and len(lyrics) > line_number
     ):
         found_words = _found_words
         found_words_start_time = _found_words_start_time
-        _found_words = lyrics["lines"][line_number]["words"]
-        _found_words_start_time = int(lyrics["lines"][line_number]["startTimeMs"])
+        _found_words = lyrics[line_number]["words"]
+        _found_words_start_time = int(lyrics[line_number]["startTimeMs"])
         line_number += 1
 
     return found_words
