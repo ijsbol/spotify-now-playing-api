@@ -27,7 +27,7 @@ import base64
 import json
 from os import getenv
 import time
-from typing import Any, Final, TypedDict, cast
+from typing import Any, Final, Literal, TypedDict, cast
 
 from aiohttp import ClientSession, ContentTypeError
 from dotenv import load_dotenv
@@ -59,6 +59,7 @@ with open("cache.json", "w+") as f:
 class LyricCache(TypedDict):
     track_id: str
     lines: list[Any]
+    sync_type: Literal["LINE_SYNCED"] | Literal["UNSYNCED"] | None
 
 
 router = APIRouter()
@@ -104,10 +105,10 @@ async def get_user_token() -> str:
 
 
 
-async def get_lyrics_from_api(track_id: str) -> Any:
-    lyric_cache: LyricCache = cache_get("lyric_cache") or LyricCache(track_id="", lines=[])
+async def get_lyrics_from_api(track_id: str) -> LyricCache:
+    lyric_cache: LyricCache = cache_get("lyric_cache") or LyricCache(track_id="", lines=[], sync_type=None)
     if lyric_cache["track_id"] == track_id:
-        return lyric_cache["lines"]
+        return lyric_cache
 
     lyric_cache["track_id"] = track_id
     async with ClientSession() as session:
@@ -123,11 +124,12 @@ async def get_lyrics_from_api(track_id: str) -> Any:
                 try:
                     json = await resp.json()
                     lyric_cache["lines"] = json["lines"]
+                    lyric_cache["sync_type"] = json["sync_type"]
                 except ContentTypeError:
                     lyric_cache["lines"] = []
 
     cache_update("lyric_cache", lyric_cache)
-    return lyric_cache["lines"]
+    return lyric_cache
 
 
 async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
@@ -138,7 +140,12 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
     _found_words_start_time: int = found_words_start_time
 
     # No lyrics found
-    if lyrics is None or len(lyrics) == 0:
+    if (
+        lyrics is None
+        or len(lyrics["lines"]) == 0
+        or lyrics["sync_type"] is None
+        or lyrics["sync_type"] == "UNSYNCED"
+    ):
         return found_words
 
     line_number: int = 0
@@ -148,8 +155,8 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
     ):
         found_words = _found_words
         found_words_start_time = _found_words_start_time
-        _found_words = lyrics[line_number]["words"]
-        _found_words_start_time = int(lyrics[line_number]["startTimeMs"])
+        _found_words = lyrics["lines"][line_number]["words"]
+        _found_words_start_time = int(lyrics["lines"][line_number]["startTimeMs"])
         line_number += 1
 
     return found_words
