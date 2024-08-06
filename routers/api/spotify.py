@@ -124,7 +124,7 @@ async def get_lyrics_from_api(track_id: str) -> LyricCache:
                 try:
                     json = await resp.json()
                     lyric_cache["lines"] = json["lines"]
-                    lyric_cache["sync_type"] = json["sync_type"]
+                    lyric_cache["sync_type"] = json["syncType"]
                 except ContentTypeError:
                     lyric_cache["lines"] = []
 
@@ -151,7 +151,7 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
     line_number: int = 0
     while (
         _found_words_start_time < time_ms
-        and len(lyrics) > line_number
+        and len(lyrics["lines"]) > line_number
     ):
         found_words = _found_words
         found_words_start_time = _found_words_start_time
