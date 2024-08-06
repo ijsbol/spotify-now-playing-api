@@ -10,5 +10,5 @@ worker_class: Final[str] = 'uvicorn.workers.UvicornWorker'
 
 # Logging Options
 loglevel: Final[str] = 'error'
-accesslog: Final[str] = '/root/api.1sabelle.dev/logs/access_log'
-errorlog: Final[str] =  '/root/api.1sabelle.dev/logs/error_log'
+accesslog: Final[str] = 'logs/access_log'
+errorlog: Final[str] =  'logs/error_log'
