@@ -132,7 +132,7 @@ async def get_lyrics_from_api(track_id: str) -> LyricCache:
     return lyric_cache
 
 
-async def get_lyrics_at_time(track_id: str, time_ms: int, total_duration_ms: int) -> str:
+async def get_lyrics_at_time(track_id: str, time_ms: int, total_duration_ms: int) -> tuple[str, bool]:
     lyrics = await get_lyrics_from_api(track_id)
     found_words: str = "No lyrics found"
     found_words_start_time: int = 0
@@ -145,14 +145,14 @@ async def get_lyrics_at_time(track_id: str, time_ms: int, total_duration_ms: int
         or len(lyrics["lines"]) == 0
         or lyrics["sync_type"] is None
     ):
-        return found_words
+        return (found_words, True)
 
     # If unsynced lyrics, guess the current lyric :)
     if lyrics["sync_type"] == "UNSYNCED":
         lines = lyrics["lines"]
         number_of_lines = len(lines)
         estimated_line = int((time_ms / total_duration_ms) * number_of_lines)
-        return lines[estimated_line]
+        return (lines[estimated_line], False)
 
 
     line_number: int = 0
@@ -166,7 +166,7 @@ async def get_lyrics_at_time(track_id: str, time_ms: int, total_duration_ms: int
         _found_words_start_time = int(lyrics["lines"][line_number]["startTimeMs"])
         line_number += 1
 
-    return found_words
+    return (found_words, True)
 
 
 @router.get('/spotify/now-playing')
@@ -195,13 +195,15 @@ async def get_spotify_now_playing(request: Request, include_lyrics: bool = True)
             time_ms: int = spotify_data["progress_ms"]
             current_lyric: str = "Lyric fetching disabled."
             total_duration_ms: int = int(spotify_data["item"]["duration_ms"])
+            lyric_synced: bool = True
             if include_lyrics:
-                current_lyric: str = await get_lyrics_at_time(track_id, time_ms, total_duration_ms)
+                current_lyric, lyric_synced = await get_lyrics_at_time(track_id, time_ms, total_duration_ms)
             return JSONResponse(
                 status_code=resp.status,
                 headers={"Access-Control-Allow-Origin": "*"},
                 content={
                     "song_data": spotify_data,
                     "current_lyric": current_lyric,
+                    "lyric_synced": lyric_synced,
                 },
             )
