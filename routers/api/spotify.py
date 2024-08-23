@@ -184,7 +184,7 @@ async def get_spotify_now_playing(request: Request, include_lyrics: bool = True)
                     content={"status": "No song playing"}
                 )
             spotify_data: dict[str, Any] = await resp.json()
-            track_id: str = spotify_data["item"]["id"]
+            track_id: str = spotify_data["item"]["external_ids"]["isrc"]
             time_ms: int = spotify_data["progress_ms"]
             current_lyric: str = "Lyric fetching disabled."
             if include_lyrics:
