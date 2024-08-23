@@ -132,7 +132,7 @@ async def get_lyrics_from_api(track_id: str) -> LyricCache:
     return lyric_cache
 
 
-async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
+async def get_lyrics_at_time(track_id: str, time_ms: int, total_duration_ms: int) -> str:
     lyrics = await get_lyrics_from_api(track_id)
     found_words: str = "No lyrics found"
     found_words_start_time: int = 0
@@ -144,9 +144,16 @@ async def get_lyrics_at_time(track_id: str, time_ms: int) -> str:
         lyrics is None
         or len(lyrics["lines"]) == 0
         or lyrics["sync_type"] is None
-        or lyrics["sync_type"] == "UNSYNCED"
     ):
         return found_words
+
+    # If unsynced lyrics, guess the current lyric :)
+    if lyrics["sync_type"] == "UNSYNCED":
+        lines = lyrics["lines"]
+        number_of_lines = len(lines)
+        estimated_line = int((time_ms / total_duration_ms) * number_of_lines)
+        return lines[estimated_line]
+
 
     line_number: int = 0
     while (
@@ -187,8 +194,9 @@ async def get_spotify_now_playing(request: Request, include_lyrics: bool = True)
             track_id: str = spotify_data["item"]["external_ids"]["isrc"]
             time_ms: int = spotify_data["progress_ms"]
             current_lyric: str = "Lyric fetching disabled."
+            total_duration_ms: int = int(spotify_data["item"]["duration_ms"])
             if include_lyrics:
-                current_lyric: str = await get_lyrics_at_time(track_id, time_ms)
+                current_lyric: str = await get_lyrics_at_time(track_id, time_ms, total_duration_ms)
             return JSONResponse(
                 status_code=resp.status,
                 headers={"Access-Control-Allow-Origin": "*"},
